@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pragmatic Tiger"
+  short_description: "Apply risk-scaled TigerStyle engineering judgment"
+  default_prompt: "Use $pragmatic-tiger after $bevy-019 and $rust-modern to review project-level safety, bounds, performance, and maintenance tradeoffs."

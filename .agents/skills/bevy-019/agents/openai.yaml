@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bevy 0.19"
+  short_description: "Apply target-agnostic Bevy 0.19 coding rules"
+  default_prompt: "Use $bevy-019 to write or review target-agnostic Bevy 0.19 code."

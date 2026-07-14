@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Modern"
+  short_description: "Apply portable modern Rust 2024 coding rules"
+  default_prompt: "Use $rust-modern to write or review portable, idiomatic Rust 2024 code."

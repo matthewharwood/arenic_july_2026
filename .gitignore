@@ -1,0 +1,18 @@
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Rust / Cargo workspaces
+**/target/
+**/*.rs.bk
+**/mutants.out*/
+*.pdb
+rustc-ice-*.txt
+
+# Bevy / wgpu generated artifacts
+**/imported_assets/
+**/screenshot-*.png
+dxcompiler.dll
+dxil.dll
