@@ -17,4 +17,3 @@ rustc-ice-*.txt
 dxcompiler.dll
 dxil.dll
 .tmp/**
-game/crates/ecs-visualizer/index.html

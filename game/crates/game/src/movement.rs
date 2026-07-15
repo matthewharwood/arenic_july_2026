@@ -7,6 +7,14 @@ use crate::{
 
 type ControllableHero = (With<Hero>, With<Selected>, With<Active>);
 
+/// Resolves conflicting presses independently of gamepad query order.
+const DPAD_BUTTON_PRIORITY: [GamepadButton; 4] = [
+    GamepadButton::DPadUp,
+    GamepadButton::DPadDown,
+    GamepadButton::DPadLeft,
+    GamepadButton::DPadRight,
+];
+
 /// Adds device input and tile-based hero movement.
 pub struct HeroMovementPlugin;
 
@@ -25,7 +33,9 @@ impl Plugin for HeroMovementPlugin {
 
 /// A hardware-independent request to move the active, selected hero.
 #[derive(Message, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct MoveHero(pub CardinalDirection);
+pub(crate) struct MoveHero {
+    pub(crate) direction: CardinalDirection,
+}
 
 /// A single tile-aligned movement direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,24 +58,16 @@ impl CardinalDirection {
 }
 
 fn read_gamepad_movement(gamepads: Query<&Gamepad>, mut moves: MessageWriter<MoveHero>) {
-    for gamepad in &gamepads {
-        if let Some(direction) = direction_for_pressed_dpad(gamepad) {
-            moves.write(MoveHero(direction));
-            return;
-        }
+    if let Some(direction) = direction_for_pressed_dpad(&gamepads) {
+        moves.write(MoveHero { direction });
     }
 }
 
-fn direction_for_pressed_dpad(gamepad: &Gamepad) -> Option<CardinalDirection> {
-    [
-        GamepadButton::DPadUp,
-        GamepadButton::DPadDown,
-        GamepadButton::DPadLeft,
-        GamepadButton::DPadRight,
-    ]
-    .into_iter()
-    .find(|button| gamepad.just_pressed(*button))
-    .and_then(direction_for_button)
+fn direction_for_pressed_dpad(gamepads: &Query<&Gamepad>) -> Option<CardinalDirection> {
+    DPAD_BUTTON_PRIORITY
+        .into_iter()
+        .find(|button| gamepads.iter().any(|gamepad| gamepad.just_pressed(*button)))
+        .and_then(direction_for_button)
 }
 
 const fn direction_for_button(button: GamepadButton) -> Option<CardinalDirection> {
@@ -80,12 +82,12 @@ const fn direction_for_button(button: GamepadButton) -> Option<CardinalDirection
 
 fn apply_hero_movement(
     mut moves: MessageReader<MoveHero>,
-    mut heroes: Query<&mut Transform, ControllableHero>,
+    mut hero: Single<&mut Transform, ControllableHero>,
 ) {
     let mut direction = None;
 
     for movement in moves.read() {
-        direction.get_or_insert(movement.0);
+        direction.get_or_insert(movement.direction);
     }
 
     let Some(direction) = direction else {
@@ -93,10 +95,8 @@ fn apply_hero_movement(
     };
 
     let offset = direction.tile_offset().as_vec2() * tile::SIZE;
-    for mut transform in &mut heroes {
-        transform.translation.x += offset.x;
-        transform.translation.y += offset.y;
-    }
+    hero.translation.x += offset.x;
+    hero.translation.y += offset.y;
 }
 
 #[cfg(test)]
@@ -134,11 +134,19 @@ mod tests {
     }
 
     #[test]
-    fn dpad_press_moves_the_hero_one_tile() {
+    fn dpad_press_moves_only_the_active_selected_hero_one_tile() {
         let mut app = movement_test_app();
         let hero = app
             .world_mut()
             .spawn((Hero, Selected, Active, Transform::default()))
+            .id();
+        let inactive_hero = app
+            .world_mut()
+            .spawn((Hero, Selected, Transform::default()))
+            .id();
+        let unselected_hero = app
+            .world_mut()
+            .spawn((Hero, Active, Transform::default()))
             .id();
         let gamepad = app.world_mut().spawn(Gamepad::default()).id();
 
@@ -150,6 +158,35 @@ mod tests {
         app.update();
 
         assert_eq!(hero_position(&app, hero), Vec3::new(0.0, -tile::SIZE, 0.0));
+        assert_eq!(hero_position(&app, inactive_hero), Vec3::ZERO);
+        assert_eq!(hero_position(&app, unselected_hero), Vec3::ZERO);
+    }
+
+    #[test]
+    fn simultaneous_dpad_presses_follow_fixed_priority_across_gamepads() {
+        for buttons in [
+            [GamepadButton::DPadRight, GamepadButton::DPadUp],
+            [GamepadButton::DPadUp, GamepadButton::DPadRight],
+        ] {
+            let mut app = movement_test_app();
+            let hero = app
+                .world_mut()
+                .spawn((Hero, Selected, Active, Transform::default()))
+                .id();
+
+            for button in buttons {
+                let gamepad = app.world_mut().spawn(Gamepad::default()).id();
+                app.world_mut()
+                    .get_mut::<Gamepad>(gamepad)
+                    .expect("invariant: the test gamepad entity has a Gamepad component")
+                    .digital_mut()
+                    .press(button);
+            }
+
+            app.update();
+
+            assert_eq!(hero_position(&app, hero), Vec3::new(0.0, tile::SIZE, 0.0));
+        }
     }
 
     fn movement_test_app() -> App {

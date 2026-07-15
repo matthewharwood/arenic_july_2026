@@ -7,10 +7,13 @@ use crate::{
     tile,
 };
 
-const ARENA_ZOOM: f32 = 24.0;
-const OVERWORLD_ZOOM: f32 = 72.0;
-const CAMERA_ZOOMS: [f32; 2] = [ARENA_ZOOM, OVERWORLD_ZOOM];
-const DEFAULT_CAMERA_ZOOM: f32 = CAMERA_ZOOMS[0];
+const TOP_DOWN_CAMERA_DISTANCE: f32 = 24.0;
+
+const TOP_DOWN_FIELD_OF_VIEW_RADIANS: f32 = FRAC_PI_8;
+const OVER_SHOULDER_FIELD_OF_VIEW_RADIANS: f32 = FRAC_PI_4;
+const CAMERA_NEAR_PLANE: f32 = 0.05;
+const CAMERA_FAR_PLANE: f32 = 150.0;
+const CAMERA_CLEAR_COLOR: Color = Color::oklch(0.117_456, 0.007_587, 285.173);
 
 const SHOULDER_BACK_DISTANCE: f32 = tile::SIZE * 3.0;
 const SHOULDER_RIGHT_OFFSET: f32 = tile::SIZE * 0.9;
@@ -25,7 +28,7 @@ pub struct GameCameraPlugin;
 impl Plugin for GameCameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraView>()
-            .add_systems(Startup, (spawn_top_down_camera, spawn_over_shoulder_camera))
+            .add_systems(Startup, spawn_camera_scene)
             .add_systems(Update, (attach_over_shoulder_camera, toggle_camera_view));
     }
 }
@@ -48,49 +51,64 @@ impl CameraView {
 }
 
 /// Marks the retained top-down arena/overworld camera.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 struct TopDownCamera;
 
 /// Marks the active camera that follows the selected hero's right shoulder.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 struct OverShoulderCamera;
 
-fn spawn_top_down_camera(mut commands: Commands, camera_view: Res<CameraView>) {
-    commands.spawn((
-        TopDownCamera,
-        Camera3d::default(),
-        Projection::Perspective(PerspectiveProjection {
-            fov: FRAC_PI_8,
-            near: 0.05,
-            far: 150.0,
-            ..default()
-        }),
-        Camera {
-            is_active: matches!(*camera_view, CameraView::Arena),
-            clear_color: ClearColorConfig::Custom(Color::srgb(0.02, 0.02, 0.03)),
-            ..default()
-        },
-        Transform::from_xyz(0.0, 0.0, DEFAULT_CAMERA_ZOOM).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+fn spawn_camera_scene(mut commands: Commands, camera_view: Res<CameraView>) {
+    commands.spawn_scene_list(camera_scene(*camera_view));
 }
 
-fn spawn_over_shoulder_camera(mut commands: Commands, camera_view: Res<CameraView>) {
-    commands.spawn((
-        OverShoulderCamera,
-        Camera3d::default(),
-        Projection::Perspective(PerspectiveProjection {
-            fov: FRAC_PI_4,
-            near: 0.05,
-            far: 150.0,
-            ..default()
-        }),
+/// Describes both retained cameras for the requested initial view.
+fn camera_scene(camera_view: CameraView) -> impl SceneList {
+    let top_down_is_active = matches!(camera_view, CameraView::Arena);
+    let over_shoulder_is_active = matches!(camera_view, CameraView::OverShoulder);
+
+    bsn_list![
+        top_down_camera_scene(top_down_is_active),
+        over_shoulder_camera_scene(over_shoulder_is_active),
+    ]
+}
+
+fn top_down_camera_scene(is_active: bool) -> impl Scene {
+    bsn! {
+        TopDownCamera
+        camera_3d_scene(is_active, TOP_DOWN_FIELD_OF_VIEW_RADIANS)
+        template_value(top_down_transform())
+    }
+}
+
+fn over_shoulder_camera_scene(is_active: bool) -> impl Scene {
+    bsn! {
+        OverShoulderCamera
+        camera_3d_scene(is_active, OVER_SHOULDER_FIELD_OF_VIEW_RADIANS)
+        template_value(over_shoulder_local_transform())
+    }
+}
+
+fn camera_3d_scene(is_active: bool, field_of_view_radians: f32) -> impl Scene {
+    let projection = Projection::Perspective(PerspectiveProjection {
+        fov: field_of_view_radians,
+        near: CAMERA_NEAR_PLANE,
+        far: CAMERA_FAR_PLANE,
+        ..default()
+    });
+
+    bsn! {
+        Camera3d
         Camera {
-            is_active: matches!(*camera_view, CameraView::OverShoulder),
-            clear_color: ClearColorConfig::Custom(Color::srgb(0.02, 0.02, 0.03)),
-            ..default()
-        },
-        over_shoulder_local_transform(),
-    ));
+            is_active,
+            clear_color: ClearColorConfig::Custom(CAMERA_CLEAR_COLOR),
+        }
+        template_value(projection)
+    }
+}
+
+fn top_down_transform() -> Transform {
+    Transform::from_xyz(0.0, 0.0, TOP_DOWN_CAMERA_DISTANCE).looking_at(Vec3::ZERO, Vec3::Y)
 }
 
 /// Reparents the over-the-shoulder camera to the active selected hero.
@@ -100,9 +118,10 @@ fn attach_over_shoulder_camera(
     over_shoulder_camera: Single<(Entity, Option<&ChildOf>), With<OverShoulderCamera>>,
 ) {
     let hero = active_selected_hero.into_inner();
-    let (camera, parent) = over_shoulder_camera.into_inner();
+    let (camera, child_of) = over_shoulder_camera.into_inner();
+    let current_parent = child_of.map(ChildOf::parent);
 
-    if parent.is_none_or(|parent| parent.parent() != hero) {
+    if current_parent != Some(hero) {
         commands.entity(camera).insert(ChildOf(hero));
     }
 }
@@ -142,6 +161,7 @@ fn over_shoulder_local_transform() -> Transform {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::scene::ScenePlugin;
 
     #[test]
     fn shoulder_camera_local_position_is_behind_above_and_to_the_heros_right() {
@@ -164,6 +184,26 @@ mod tests {
     fn camera_view_toggle_alternates_between_both_views() {
         assert_eq!(CameraView::OverShoulder.toggled(), CameraView::Arena);
         assert_eq!(CameraView::Arena.toggled(), CameraView::OverShoulder);
+    }
+
+    #[test]
+    fn camera_scene_spawns_both_cameras_with_the_requested_view_active() {
+        for camera_view in [CameraView::Arena, CameraView::OverShoulder] {
+            let mut app = camera_scene_test_app(camera_view);
+
+            assert_camera::<TopDownCamera>(
+                &mut app,
+                matches!(camera_view, CameraView::Arena),
+                TOP_DOWN_FIELD_OF_VIEW_RADIANS,
+                top_down_transform(),
+            );
+            assert_camera::<OverShoulderCamera>(
+                &mut app,
+                matches!(camera_view, CameraView::OverShoulder),
+                OVER_SHOULDER_FIELD_OF_VIEW_RADIANS,
+                over_shoulder_local_transform(),
+            );
+        }
     }
 
     #[test]
@@ -234,6 +274,42 @@ mod tests {
                 .get::<Camera>(over_shoulder_camera)
                 .is_some_and(|camera| !camera.is_active)
         );
+    }
+
+    fn camera_scene_test_app(camera_view: CameraView) -> App {
+        let mut app = App::new();
+        app.add_plugins((
+            TaskPoolPlugin::default(),
+            AssetPlugin::default(),
+            ScenePlugin,
+        ))
+        .insert_resource(camera_view)
+        .add_systems(Startup, spawn_camera_scene);
+        app.update();
+        app
+    }
+
+    fn assert_camera<M: Component>(
+        app: &mut App,
+        expected_active: bool,
+        expected_field_of_view_radians: f32,
+        expected_transform: Transform,
+    ) {
+        let world = app.world_mut();
+        let mut query =
+            world.query_filtered::<(&Camera, &Projection, &Transform), (With<M>, With<Camera3d>)>();
+        let (camera, projection, transform) = query
+            .single(world)
+            .expect("invariant: the camera scene spawns exactly one camera for this marker");
+        let Projection::Perspective(projection) = projection else {
+            panic!("invariant: each game camera uses a perspective projection");
+        };
+
+        assert_eq!(camera.is_active, expected_active);
+        assert_eq!(projection.fov, expected_field_of_view_radians);
+        assert_eq!(projection.near, CAMERA_NEAR_PLANE);
+        assert_eq!(projection.far, CAMERA_FAR_PLANE);
+        assert_eq!(transform, &expected_transform);
     }
 
     fn camera_parent(app: &App, camera: Entity) -> Entity {

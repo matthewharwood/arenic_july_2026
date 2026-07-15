@@ -6,37 +6,31 @@ use crate::tile;
 pub const RADIUS: f32 = tile::SIZE * 0.5;
 
 /// Marks the player-controlled character.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 pub struct Hero;
 
 /// Marks a hero as part of the player's current selection.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 pub struct Selected;
 
 /// Marks a selected hero as currently able to receive player actions.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 pub struct Active;
 
-pub fn spawn(
-    commands: &mut Commands,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) -> Entity {
-    let mesh = meshes.add(Sphere::new(RADIUS));
-    let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.2, 0.7, 1.0),
+/// Describes the initially selected, player-controlled hero.
+pub fn scene() -> impl Scene {
+    let material = StandardMaterial {
+        base_color: Color::oklch(0.732_032, 0.153_756, 240.894),
         unlit: true,
         ..default()
-    });
+    };
 
-    commands
-        .spawn((
-            Hero,
-            Selected,
-            Active,
-            Mesh3d(mesh),
-            MeshMaterial3d(material),
-            Transform::from_xyz(0.0, 0.0, RADIUS),
-        ))
-        .id()
+    bsn! {
+        Hero
+        Selected
+        Active
+        Mesh3d(asset_value(Sphere::new(RADIUS)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(material))
+        Transform::from_xyz(0.0, 0.0, RADIUS)
+    }
 }
