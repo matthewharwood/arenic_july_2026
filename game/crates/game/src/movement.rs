@@ -153,9 +153,7 @@ fn apply_hero_movement(
     }
 
     *grid_position = destination;
-    let world_xy = destination.world_xy();
-    transform.translation.x = world_xy.x;
-    transform.translation.y = world_xy.y;
+    transform.translation = destination.world_xy().extend(transform.translation.z);
 }
 
 #[cfg(test)]

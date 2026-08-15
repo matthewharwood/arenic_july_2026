@@ -126,16 +126,18 @@ impl Plugin for HeroAbilitiesPlugin {
 
 /// Handles for the ability sounds loaded once for reuse by short-lived players.
 #[derive(Resource, Debug, Clone)]
-struct AbilitySounds(HashMap<AbilitySoundKey, Handle<AudioSource>>);
+struct AbilitySounds {
+    handles: HashMap<AbilitySoundKey, Handle<AudioSource>>,
+}
 
 /// One paired Bash animation, stored on its attacking hero.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Clone)]
 struct BashAnimation {
     target: Entity,
     direction: Vec2,
     hero_origin: Vec3,
     target_origin: Vec3,
-    elapsed_seconds: f32,
+    timer: Timer,
 }
 
 impl BashAnimation {
@@ -150,13 +152,8 @@ impl BashAnimation {
             direction: direction.tile_offset().as_vec2(),
             hero_origin,
             target_origin,
-            elapsed_seconds: 0.0,
+            timer: Timer::from_seconds(BASH_DURATION_SECONDS, TimerMode::Once),
         }
-    }
-
-    fn advance(&mut self, delta_seconds: f32) -> f32 {
-        self.elapsed_seconds = (self.elapsed_seconds + delta_seconds).min(BASH_DURATION_SECONDS);
-        self.elapsed_seconds / BASH_DURATION_SECONDS
     }
 }
 
@@ -173,21 +170,17 @@ fn load_ability_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
             "invariant: each ability phase has at most one sound"
         );
     }
-    commands.insert_resource(AbilitySounds(sounds));
+    commands.insert_resource(AbilitySounds { handles: sounds });
 }
 
 fn play_ability_sounds(
     mut entered_phases: MessageReader<AbilityPhaseEntered>,
-    sounds: Option<Res<AbilitySounds>>,
+    sounds: Res<AbilitySounds>,
     mut commands: Commands,
 ) {
-    let Some(sounds) = sounds else {
-        return;
-    };
-
     for entered_phase in entered_phases.read() {
         let key = AbilitySoundKey::new(entered_phase.ability, entered_phase.phase);
-        let Some(sound) = sounds.0.get(&key) else {
+        let Some(sound) = sounds.handles.get(&key) else {
             continue;
         };
 
@@ -270,14 +263,15 @@ fn animate_bashes(
             continue;
         };
 
-        let progress = animation.advance(time.delta_secs());
+        animation.timer.tick(time.delta());
+        let progress = animation.timer.fraction();
         let direction = animation.direction.extend(0.0) * BASH_DISTANCE;
         hero_transform.translation =
             animation.hero_origin + direction * attacker_displacement(progress);
         target_transform.translation =
             animation.target_origin + direction * target_displacement(progress);
 
-        if progress < 1.0 {
+        if !animation.timer.is_finished() {
             continue;
         }
 
@@ -307,15 +301,10 @@ fn pulse(progress: f32, start: f32, peak: f32, end: f32) -> f32 {
     if progress <= start || progress >= end {
         0.0
     } else if progress <= peak {
-        smoothstep((progress - start) / (peak - start))
+        EaseFunction::SmoothStep.sample_clamped((progress - start) / (peak - start))
     } else {
-        1.0 - smoothstep((progress - peak) / (end - peak))
+        1.0 - EaseFunction::SmoothStep.sample_clamped((progress - peak) / (end - peak))
     }
-}
-
-fn smoothstep(progress: f32) -> f32 {
-    let progress = progress.clamp(0.0, 1.0);
-    progress * progress * (3.0 - 2.0 * progress)
 }
 
 #[cfg(test)]
@@ -453,10 +442,12 @@ mod tests {
         let mut app = App::new();
         app.init_resource::<Time>()
             .add_plugins((HeroMovementPlugin, HeroAbilitiesPlugin))
-            .insert_resource(AbilitySounds(HashMap::from([(
-                AbilitySoundKey::new(Ability::Bash, AbilityPhase::Impact),
-                Handle::default(),
-            )])));
+            .insert_resource(AbilitySounds {
+                handles: HashMap::from([(
+                    AbilitySoundKey::new(Ability::Bash, AbilityPhase::Impact),
+                    Handle::default(),
+                )]),
+            });
         app
     }
 
