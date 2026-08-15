@@ -1,3 +1,4 @@
+mod abilities;
 mod camera;
 mod enemy;
 mod hero;
@@ -17,7 +18,11 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((camera::GameCameraPlugin, movement::HeroMovementPlugin))
+        .add_plugins((
+            camera::GameCameraPlugin,
+            movement::HeroMovementPlugin,
+            abilities::HeroAbilitiesPlugin,
+        ))
         .add_systems(Startup, arena.spawn())
         .run();
 }
@@ -49,6 +54,7 @@ mod tests {
         assert_single_rendered_entity::<tile::Tile>(&mut app);
         assert_single_rendered_entity::<hero::Hero>(&mut app);
         assert_single_rendered_entity::<enemy::Boss>(&mut app);
+        assert_initial_hero_abilities(&mut app);
     }
 
     fn assert_single_rendered_entity<M: Component>(app: &mut App) {
@@ -59,5 +65,18 @@ mod tests {
         query
             .single(world)
             .expect("invariant: the arena scene has one rendered entity for this marker");
+    }
+
+    fn assert_initial_hero_abilities(app: &mut App) {
+        let world = app.world_mut();
+        let mut query = world.query_filtered::<&abilities::Abilities, With<hero::Hero>>();
+        let hero_abilities = query
+            .single(world)
+            .expect("invariant: the arena scene has exactly one hero with abilities");
+
+        assert_eq!(
+            hero_abilities.slots,
+            [Some(abilities::Ability::Bash), None, None, None,]
+        );
     }
 }
