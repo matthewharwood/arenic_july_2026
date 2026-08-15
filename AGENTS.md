@@ -76,7 +76,7 @@
 
 ## Validation
 
-- Run Cargo commands from `game` unless the task requires another working directory.
+- Run Cargo commands from the repository root unless the task requires another working directory.
 - For Rust, Bevy, Cargo, or build-configuration changes, run `cargo fmt --all --check`.
 - For Rust or Bevy code changes, run `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`.
 - Validate ordinary Rust, Bevy, Cargo, or build-configuration changes with `cargo build --workspace` on the current host.

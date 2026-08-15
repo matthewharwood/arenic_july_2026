@@ -1,3 +1,0 @@
-[workspace]
-members = ["crates/game"]
-resolver = "3"

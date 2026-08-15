@@ -11,22 +11,21 @@ window to stop the application.
 
 ## Run
 
-From the repository root:
+From anywhere inside the repository:
 
 ```sh
-cd game
 cargo run -p game
 ```
 
 The first run takes longer because Cargo must compile Bevy and its dependencies.
-Running from `game` also keeps Bevy's future asset paths rooted at `game/assets`.
+Cargo discovers the workspace manifest by searching parent directories up to the
+repository root.
 
 ## Validate
 
-Run the repository's ordinary checks from the Cargo workspace:
+Run the repository's ordinary checks from anywhere inside the repository:
 
 ```sh
-cd game
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
@@ -35,5 +34,6 @@ cargo build --workspace
 
 ## IDE setup
 
-The Cargo workspace manifest is `game/Cargo.toml`. If an IDE does not discover
-the project automatically, attach or open that manifest as the Cargo project.
+The Cargo workspace manifest is `Cargo.toml` at the repository root. If an IDE
+does not discover the project automatically, attach or open that manifest as
+the Cargo project.
