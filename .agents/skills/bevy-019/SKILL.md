@@ -72,7 +72,7 @@ Prefer direct component tuples:
 ```rust
 commands.spawn((
     Sprite {
-        color: Color::srgb(0.2, 0.7, 1.0),
+        color: Color::oklch(0.732_032, 0.153_756, 240.894),
         custom_size: Some(Vec2::new(64.0, 64.0)),
         ..default()
     },
@@ -85,7 +85,7 @@ For meshes:
 ```rust
 commands.spawn((
     Mesh2d(meshes.add(Rectangle::new(80.0, 40.0))),
-    MeshMaterial2d(materials.add(Color::srgb(0.9, 0.4, 0.1))),
+    MeshMaterial2d(materials.add(Color::oklch(0.658_092, 0.177_130, 45.487))),
     Transform::from_xyz(0.0, 0.0, 0.0),
 ));
 ```

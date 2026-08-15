@@ -16,3 +16,4 @@ rustc-ice-*.txt
 **/screenshot-*.png
 dxcompiler.dll
 dxil.dll
+.tmp/**

@@ -125,6 +125,21 @@ Leave Cargo mechanics and Bevy feature mechanics to their owning skills.
 - Centralize orchestration when it makes the sequence and failure policy easier
   to inspect; keep subordinate calculations focused.
 
+## Keep Change Surfaces Cohesive
+
+- Import functionality through the owning module's intended public API rather
+  than reaching through deep internal paths. When the front-door API is
+  missing something legitimate callers need, improve that boundary instead of
+  spreading knowledge of the module's internal layout. This keeps internal
+  refactors local to the owning module.
+- Treat roughly 1,000 lines as a design-review threshold for a source file, not
+  a size target. As a file approaches that threshold, stop appending and agree
+  on the distinct concepts it contains before changing its structure.
+- Split an oversized file along a real fault line: focused modules in a folder,
+  a cohesive submodule, or declarative data moved into an appropriate table.
+  Preserve cohesive files below the threshold; do not pre-split code merely to
+  reduce the line count.
+
 ## Explain Decisions
 
 - Choose precise domain nouns and verbs. Include units or qualifiers in a name
@@ -164,7 +179,11 @@ Before completion:
 2. Check that overload and exhaustion behavior is intentional.
 3. Measure the budgets that materially affect acceptance.
 4. Record any accepted compromise and its removal trigger.
-5. Confirm that no rule here overrides or duplicates `bevy-019` or
+5. Confirm imports use intentional module APIs rather than avoidable internal
+   paths.
+6. Confirm changed source files remain below the design-review threshold or
+   document the agreed conceptual split before adding more code.
+7. Confirm that no rule here overrides or duplicates `bevy-019` or
    `rust-modern`.
 
 ## Explicit Non-Goals
