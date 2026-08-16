@@ -3,7 +3,7 @@ use bevy::{ecs::schedule::common_conditions::on_message, prelude::*};
 use crate::{
     enemy::Enemy,
     hero::{Active, Hero, Selected},
-    tile::GridPosition,
+    tile::{GridActor, GridPosition},
 };
 
 type ControllableHero = (
@@ -33,9 +33,13 @@ impl Plugin for HeroMovementPlugin {
             .add_systems(Update, read_gamepad_movement)
             .add_systems(
                 FixedUpdate,
-                apply_hero_movement
-                    .in_set(HeroMovementSet::Apply)
-                    .run_if(on_message::<MoveHero>),
+                (
+                    initialize_added_grid_actors,
+                    apply_hero_movement
+                        .in_set(HeroMovementSet::Apply)
+                        .run_if(on_message::<MoveHero>),
+                )
+                    .chain(),
             );
     }
 }
@@ -104,6 +108,30 @@ const fn direction_for_button(button: GamepadButton) -> Option<CardinalDirection
         GamepadButton::DPadLeft => Some(CardinalDirection::Left),
         GamepadButton::DPadRight => Some(CardinalDirection::Right),
         _ => None,
+    }
+}
+
+fn initialize_added_grid_actors(
+    mut actors: Query<(Entity, Option<&GridPosition>, &mut Transform), Added<GridActor>>,
+    mut commands: Commands,
+) {
+    for (entity, grid_position, mut transform) in &mut actors {
+        let grid_position = if let Some(grid_position) = grid_position {
+            *grid_position
+        } else {
+            let Some(grid_position) = GridPosition::from_world_xy(transform.translation.truncate())
+            else {
+                error!(
+                    "cannot initialize grid actor {entity:?} from non-finite or out-of-range translation {:?}",
+                    transform.translation
+                );
+                continue;
+            };
+            commands.entity(entity).insert(grid_position);
+            grid_position
+        };
+
+        transform.translation = grid_position.world_xy().extend(transform.translation.z);
     }
 }
 
@@ -255,6 +283,62 @@ mod tests {
             assert_eq!(hero_position(&app, hero), Vec3::new(0.0, tile::SIZE, 0.0));
             assert_eq!(hero_grid_position(&app, hero), GridPosition(IVec2::Y));
         }
+    }
+
+    #[test]
+    fn transform_only_enemy_derives_grid_position_before_collision() {
+        let mut app = movement_test_app();
+        let hero = app
+            .world_mut()
+            .spawn((Hero, Selected, Active, Transform::default()))
+            .id();
+        let enemy_grid_position = GridPosition(IVec2::Y);
+        let enemy = app
+            .world_mut()
+            .spawn((
+                Enemy,
+                Transform::from_translation(enemy_grid_position.world_xy().extend(tile::SIZE)),
+            ))
+            .id();
+
+        app.world_mut()
+            .resource_mut::<Messages<MoveHero>>()
+            .write(MoveHero {
+                direction: CardinalDirection::Up,
+            });
+        app.world_mut().run_schedule(FixedUpdate);
+
+        assert_eq!(hero_grid_position(&app, hero), GridPosition::default());
+        assert_eq!(hero_grid_position(&app, enemy), enemy_grid_position);
+        let blocked_moves = app.world().resource::<Messages<HeroMoveBlockedByEnemy>>();
+        let mut cursor = blocked_moves.get_cursor();
+        assert_eq!(
+            cursor.read(blocked_moves).copied().collect::<Vec<_>>(),
+            vec![HeroMoveBlockedByEnemy {
+                hero,
+                enemy,
+                direction: CardinalDirection::Up,
+            }]
+        );
+    }
+
+    #[test]
+    fn explicit_grid_position_corrects_a_mismatched_spawn_transform() {
+        let mut app = movement_test_app();
+        let grid_position = GridPosition(IVec2::new(-2, 3));
+        let z = tile::SIZE;
+        let enemy = app
+            .world_mut()
+            .spawn((Enemy, grid_position, Transform::from_xyz(99.0, 99.0, z)))
+            .id();
+
+        app.world_mut().run_schedule(FixedUpdate);
+
+        assert_eq!(hero_grid_position(&app, enemy), grid_position);
+        assert_eq!(
+            hero_position(&app, enemy),
+            grid_position.world_xy().extend(z)
+        );
     }
 
     fn movement_test_app() -> App {

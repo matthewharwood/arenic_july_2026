@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     abilities::{Abilities, Ability},
-    tile::{self, GridPosition},
+    tile::{self, GridActor, GridPosition},
 };
 
 /// Radius of a one-tile-wide hero.
@@ -10,7 +10,7 @@ pub const RADIUS: f32 = tile::SIZE * 0.5;
 
 /// Marks the player-controlled character.
 #[derive(Component, Debug, Default, Clone, Copy)]
-#[require(Abilities, GridPosition)]
+#[require(Abilities, GridActor)]
 pub struct Hero;
 
 /// Marks a hero as part of the player's current selection.
@@ -32,6 +32,7 @@ pub fn scene() -> impl Scene {
     bsn! {
         Hero
         Abilities::new([Some(Ability::Bash), None, None, None])
+        GridPosition::default()
         Selected
         Active
         Mesh3d(asset_value(Sphere::new(RADIUS)))

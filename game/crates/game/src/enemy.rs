@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
-use crate::tile::{self, GridPosition};
+use crate::tile::{self, GridActor, GridPosition};
 
 /// Radius of the boss's one-tile-wide cone base.
 const RADIUS: f32 = tile::SIZE * 0.5;
@@ -11,7 +11,7 @@ const TILE_OFFSET_FROM_HERO: IVec2 = IVec2::new(3, 2);
 
 /// Marks a character as hostile to the player.
 #[derive(Component, Debug, Default, Clone, Copy)]
-#[require(GridPosition)]
+#[require(GridActor)]
 pub struct Enemy;
 
 /// Marks an enemy as a boss encounter.
