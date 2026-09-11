@@ -17,3 +17,7 @@ rustc-ice-*.txt
 dxcompiler.dll
 dxil.dll
 .tmp/**
+
+# Local web output and macOS metadata
+/dist/
+.DS_Store
