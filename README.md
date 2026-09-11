@@ -1,16 +1,12 @@
 # Arenic
 
-A minimal Bevy 0.19 game.
-
-[Play Arenic in your browser](https://matthewharwood.github.io/arenic_july_2026/)
-or run it locally in a native window. Connect a controller and press a button
-to activate it, use the D-pad to move, and click the left stick to change cameras.
-The browser version requires WebGL 2 and hardware acceleration.
+A minimal Bevy 0.19 game. Running it opens the native game window; close the
+window to stop the application.
 
 ## Requirements
 
-- Rust with Cargo. Install [rustup](https://rustup.rs/) if needed; the repository's
-  `rust-toolchain.toml` selects stable Rust 1.97.1 and its check tools.
+- A current Rust toolchain with Cargo. Install one with
+  [rustup](https://rustup.rs/) if needed.
 - Graphics drivers that support Bevy's renderer.
 
 ## Run
@@ -24,19 +20,6 @@ cargo run -p game
 The first run takes longer because Cargo must compile Bevy and its dependencies.
 Cargo discovers the workspace manifest by searching parent directories up to the
 repository root.
-
-## GitHub Pages
-
-The [GitHub Actions workflow](https://github.com/matthewharwood/arenic_july_2026/actions)
-checks formatting, Clippy, tests, and the native build, and builds the game for
-`wasm32-unknown-unknown`. A push to `main` publishes to GitHub Pages only after
-both validation jobs pass. Pull requests run the same checks without deploying.
-
-The browser shell is `web/index.html`. The build packages it with the generated
-JavaScript and WebAssembly, using the `wasm-bindgen` version in `Cargo.lock`.
-`revision.txt` on the live site identifies the deployed commit; the workflow
-checks it after deployment. GitHub Pages must use **GitHub Actions** as its
-build source in the repository settings.
 
 ## Validate
 

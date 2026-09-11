@@ -13,12 +13,6 @@ fn main() {
             primary_window: Some(Window {
                 title: "Arenic".into(),
                 resolution: WindowResolution::new(1280, 720),
-                #[cfg(target_arch = "wasm32")]
-                canvas: Some("#game-canvas".into()),
-                #[cfg(target_arch = "wasm32")]
-                fit_canvas_to_parent: true,
-                #[cfg(target_arch = "wasm32")]
-                prevent_default_event_handling: false,
                 ..default()
             }),
             ..default()
