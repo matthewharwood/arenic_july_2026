@@ -1,11 +1,7 @@
-mod arena_backdrop;
 mod camera;
 mod enemy;
 mod hero;
-mod hud;
 mod movement;
-mod roster;
-mod theme;
 mod tile;
 
 use bevy::prelude::*;
@@ -27,12 +23,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((
-            camera::GameCameraPlugin,
-            movement::HeroMovementPlugin,
-            arena_backdrop::ArenaBackdropPlugin,
-            hud::HudPlugin,
-        ))
+        .add_plugins((camera::GameCameraPlugin, movement::HeroMovementPlugin))
         .add_systems(Startup, arena.spawn())
         .run();
 }

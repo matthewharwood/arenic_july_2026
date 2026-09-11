@@ -20,7 +20,7 @@ pub struct Boss;
 /// Describes the boss encounter entity in the initial arena.
 pub fn boss_scene() -> impl Scene {
     let material = StandardMaterial {
-        base_color: crate::theme::NEGATIVE,
+        base_color: Color::oklch(0.595_752, 0.222_113, 24.719),
         unlit: true,
         ..default()
     };

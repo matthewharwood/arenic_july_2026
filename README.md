@@ -7,42 +7,6 @@ or run it locally in a native window. Connect a controller and press a button
 to activate it, use the D-pad to move, and click the left stick to change cameras.
 The browser version requires WebGL 2 and hardware acceleration.
 
-## Arena HUD
-
-The native and browser versions share the same HUD and OKLCH design tokens.
-
-| Control | Action |
-| --- | --- |
-| Tab / Shift+Tab | Select the next / previous living character |
-| [ / ] | Visit the previous / next arena |
-| 1 / 2 / 3 / 4 | Four fixed ability slots, mapped to the selected class |
-| H | Open or close the controls guide |
-| R | Reserved recording control |
-| Controller D-pad | Move one tile |
-| Controller left-stick click | Switch arena / shoulder camera |
-
-Click roster icons and arena cells to navigate directly. Forty roster positions
-remain visible; extra characters appear in the reserve tray, and selecting one
-keeps it visible in the main roster. Empty positions use X, fallen characters use
-a skull, and the current selection is blue. The 3×3 arena map uses black for the
-current arena, X for empty rosters, and a red dot for an alert. Raid difficulty is
-read-only Normal.
-
-Names are stable ID-derived pairs from 100 first names and 100 surnames, with
-10,000 unique combinations before display names repeat. Buffs and debuffs count
-down on fixed ticks; tags show debuffs first, then buffs, with the soonest expiry
-first within each group. HP stays blue, XP green, gains green, and damage and
-harmful effect durations red. Stat bars ease toward changed values, while brief
-XP/HP numbers float and fade beside the bars.
-
-This iteration uses sample rosters and one world hero preview. Ability execution,
-recording, level-up rules, persistence, and global chat are not implemented. In
-the controls guide, **Preview +9 XP / -9 HP** demonstrates stat feedback explicitly
-without attaching simulated combat effects to ability buttons. Reloading resets
-the sample data. The stat-message boundary accepts at most 64 resolved changes
-per fixed tick; future combat producers must respect that contract. Presentation
-is separately bounded to eight concurrent floating labels.
-
 ## Requirements
 
 - Rust with Cargo. Install [rustup](https://rustup.rs/) if needed; the repository's

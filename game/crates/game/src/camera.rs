@@ -13,7 +13,7 @@ const TOP_DOWN_FIELD_OF_VIEW_RADIANS: f32 = FRAC_PI_8;
 const OVER_SHOULDER_FIELD_OF_VIEW_RADIANS: f32 = FRAC_PI_4;
 const CAMERA_NEAR_PLANE: f32 = 0.05;
 const CAMERA_FAR_PLANE: f32 = 150.0;
-const CAMERA_CLEAR_COLOR: Color = crate::theme::CANVAS;
+const CAMERA_CLEAR_COLOR: Color = Color::oklch(0.117_456, 0.007_587, 285.173);
 
 const SHOULDER_BACK_DISTANCE: f32 = tile::SIZE * 3.0;
 const SHOULDER_RIGHT_OFFSET: f32 = tile::SIZE * 0.9;
@@ -36,8 +36,8 @@ impl Plugin for GameCameraPlugin {
 /// The camera composition currently presented to the player.
 #[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum CameraView {
-    #[default]
     Arena,
+    #[default]
     OverShoulder,
 }
 
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn left_stick_click_activates_only_the_arena_camera() {
         let mut app = App::new();
-        app.insert_resource(CameraView::OverShoulder)
+        app.init_resource::<CameraView>()
             .add_systems(Update, toggle_camera_view);
 
         let top_down_camera = app

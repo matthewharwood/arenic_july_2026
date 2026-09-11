@@ -12,7 +12,7 @@ pub struct Tile;
 /// Describes the arena's origin tile marker.
 pub fn scene() -> impl Scene {
     let material = StandardMaterial {
-        base_color: crate::theme::INK,
+        base_color: Color::oklch(1.0, 0.0, 0.0),
         unlit: true,
         ..default()
     };
