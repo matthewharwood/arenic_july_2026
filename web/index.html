@@ -8,59 +8,45 @@
     <link rel="icon" href="data:," />
     <style>
       :root {
-        color-scheme: dark;
+        color-scheme: light;
         font-family: system-ui, sans-serif;
-        color: oklch(0.93 0.008 285);
-        background: oklch(0.117456 0.007587 285.173);
+        color: oklch(0.205 0.009 260);
+        background: oklch(0.985 0.004 90);
       }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100svh; display: flex; flex-direction: column; }
-      header, footer { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 2rem; }
-      header { justify-content: space-between; border-bottom: 1px solid oklch(0.26 0.01 285); }
-      h1 { margin: 0; font-size: 1rem; font-weight: 650; letter-spacing: 0.22em; text-transform: uppercase; }
-      .label, footer { font-size: 0.8rem; color: oklch(0.68 0.015 285); }
-      main { flex: 1; display: grid; place-items: center; padding: 1rem; }
-      #game-container { position: relative; width: min(100%, 1440px); height: min(70svh, 810px); }
+      body { margin: 0; overflow: hidden; }
+      #game-container { position: relative; width: 100vw; height: 100svh; }
       canvas { display: block; width: 100%; height: 100%; outline: none; }
-      canvas:focus-visible { outline: 2px solid oklch(0.732032 0.153756 240.894); outline-offset: 4px; }
-      #status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 2rem; background: oklch(0.117456 0.007587 285.173); }
+      #status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 2rem; background: oklch(0.985 0.004 90); }
       #status[hidden] { display: none; }
       #status p { max-width: 36rem; line-height: 1.6; }
-      footer { flex-wrap: wrap; justify-content: center; border-top: 1px solid oklch(0.26 0.01 285); text-align: center; }
-      strong { color: oklch(0.86 0.01 285); font-weight: 500; }
-      a { color: inherit; text-underline-offset: 0.2em; }
-      @media (max-width: 600px) {
-        header, footer { padding: 1rem; }
-        main { padding: 0.5rem; }
-        #game-container { height: 65svh; }
-      }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     </style>
   </head>
   <body>
-    <header>
-      <h1>Arenic</h1>
-      <span class="label">Prototype</span>
-    </header>
     <main>
       <div id="game-container">
-        <canvas id="game-canvas" tabindex="0" aria-label="Arenic game. Use a connected controller to play."></canvas>
+        <canvas id="game-canvas" tabindex="0" aria-label="Arenic arena" aria-describedby="controls"></canvas>
+        <p id="controls" class="sr-only">Tab and Shift Tab select characters. Left and right brackets change arenas. Keys 1 through 4 select ability slots. H opens the controls guide. R is reserved for recording. A controller D-pad moves the hero; click the left stick to change cameras.</p>
         <div id="status" role="status" aria-live="polite">
           <p id="status-message">Loading the arena…<br />The first visit may take a moment.</p>
         </div>
       </div>
     </main>
-    <footer>
-      <span>Connect a controller and press a button to begin.</span>
-      <span><strong>D-pad</strong> Move</span>
-      <span><strong>Left stick click</strong> Change camera</span>
-      <a href="https://github.com/matthewharwood/arenic_july_2026">Source</a>
-    </footer>
     <noscript>Enable JavaScript to play Arenic.</noscript>
     <script type="module">
       const status = document.querySelector('#status');
       const message = document.querySelector('#status-message');
       const canvas = document.querySelector('#game-canvas');
       let failed = false;
+      // Keep navigation keys in the focused game while preserving browser shortcuts.
+      const gameKeys = new Set(['Tab', 'BracketLeft', 'BracketRight', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyR', 'KeyH']);
+      canvas.addEventListener('keydown', (event) => {
+        if (!event.metaKey && !event.ctrlKey && !event.altKey && gameKeys.has(event.code)) {
+          event.preventDefault();
+        }
+      });
+
 
       function showError(error) {
         failed = true;

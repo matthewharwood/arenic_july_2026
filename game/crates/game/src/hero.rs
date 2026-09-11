@@ -20,7 +20,7 @@ pub struct Active;
 /// Describes the initially selected, player-controlled hero.
 pub fn scene() -> impl Scene {
     let material = StandardMaterial {
-        base_color: Color::oklch(0.732_032, 0.153_756, 240.894),
+        base_color: crate::theme::SELECTED,
         unlit: true,
         ..default()
     };

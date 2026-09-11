@@ -2,6 +2,7 @@ use bevy::{ecs::schedule::common_conditions::on_message, prelude::*};
 
 use crate::{
     hero::{Active, Hero, Selected},
+    hud::HudSelectionSet,
     tile,
 };
 
@@ -20,14 +21,12 @@ pub struct HeroMovementPlugin;
 
 impl Plugin for HeroMovementPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<MoveHero>().add_systems(
-            Update,
-            (
-                read_gamepad_movement,
+        app.add_message::<MoveHero>()
+            .add_systems(Update, read_gamepad_movement.after(HudSelectionSet))
+            .add_systems(
+                FixedUpdate,
                 apply_hero_movement.run_if(on_message::<MoveHero>),
-            )
-                .chain(),
-        );
+            );
     }
 }
 
@@ -57,8 +56,16 @@ impl CardinalDirection {
     }
 }
 
-fn read_gamepad_movement(gamepads: Query<&Gamepad>, mut moves: MessageWriter<MoveHero>) {
-    if let Some(direction) = direction_for_pressed_dpad(&gamepads) {
+fn read_gamepad_movement(
+    gamepads: Query<&Gamepad>,
+    heroes: Query<(), ControllableHero>,
+    mut moves: MessageWriter<MoveHero>,
+) {
+    // The selection set's deferred commands finish before this adapter, so
+    // entering an empty arena cannot enqueue input for a previous selection.
+    if heroes.single().is_ok()
+        && let Some(direction) = direction_for_pressed_dpad(&gamepads)
+    {
         moves.write(MoveHero { direction });
     }
 }
@@ -82,15 +89,16 @@ const fn direction_for_button(button: GamepadButton) -> Option<CardinalDirection
 
 fn apply_hero_movement(
     mut moves: MessageReader<MoveHero>,
-    mut hero: Single<&mut Transform, ControllableHero>,
+    mut heroes: Query<&mut Transform, ControllableHero>,
 ) {
-    let mut direction = None;
-
-    for movement in moves.read() {
-        direction.get_or_insert(movement.direction);
-    }
-
+    let direction = moves.read().next().map(|movement| movement.direction);
+    // Consume every queued intent even when no hero is active. Only the first
+    // intent may move a hero in this fixed step; nothing replays after selection.
+    moves.clear();
     let Some(direction) = direction else {
+        return;
+    };
+    let Ok(mut hero) = heroes.single_mut() else {
         return;
     };
 
@@ -156,6 +164,7 @@ mod tests {
             .digital_mut()
             .press(GamepadButton::DPadDown);
         app.update();
+        app.world_mut().run_schedule(FixedUpdate);
 
         assert_eq!(hero_position(&app, hero), Vec3::new(0.0, -tile::SIZE, 0.0));
         assert_eq!(hero_position(&app, inactive_hero), Vec3::ZERO);
@@ -184,6 +193,7 @@ mod tests {
             }
 
             app.update();
+            app.world_mut().run_schedule(FixedUpdate);
 
             assert_eq!(hero_position(&app, hero), Vec3::new(0.0, tile::SIZE, 0.0));
         }
@@ -191,15 +201,107 @@ mod tests {
 
     fn movement_test_app() -> App {
         let mut app = App::new();
-        app.add_message::<MoveHero>().add_systems(
-            Update,
-            (
-                read_gamepad_movement,
-                apply_hero_movement.run_if(on_message::<MoveHero>),
-            )
-                .chain(),
-        );
+        app.add_plugins(HeroMovementPlugin);
         app
+    }
+
+    #[derive(Resource)]
+    struct TestSelection {
+        hero: Entity,
+        active: bool,
+    }
+
+    fn sync_test_selection(
+        mut commands: Commands,
+        selection: Res<TestSelection>,
+        mut heroes: Query<&mut Transform, With<Hero>>,
+    ) {
+        if !selection.is_changed() {
+            return;
+        }
+        if selection.active {
+            let mut transform = heroes
+                .get_mut(selection.hero)
+                .expect("invariant: the test selection refers to a hero");
+            transform.translation = Vec3::ZERO;
+            commands.entity(selection.hero).insert(Active);
+        } else {
+            commands.entity(selection.hero).remove::<Active>();
+        }
+    }
+
+    #[test]
+    fn simultaneous_selection_and_dpad_input_wait_for_the_fixed_step() {
+        let mut app = movement_test_app();
+        let hero = app
+            .world_mut()
+            .spawn((Hero, Selected, Transform::from_xyz(3.0, 0.0, 0.0)))
+            .id();
+        let gamepad = app.world_mut().spawn(Gamepad::default()).id();
+        app.insert_resource(TestSelection { hero, active: true })
+            .add_systems(Update, sync_test_selection.in_set(HudSelectionSet));
+        app.world_mut()
+            .get_mut::<Gamepad>(gamepad)
+            .expect("invariant: the test gamepad entity has a Gamepad component")
+            .digital_mut()
+            .press(GamepadButton::DPadRight);
+
+        app.update();
+
+        assert_eq!(hero_position(&app, hero), Vec3::ZERO);
+        assert!(app.world().get::<Active>(hero).is_some());
+        app.world_mut().run_schedule(FixedUpdate);
+        assert_eq!(hero_position(&app, hero), Vec3::new(tile::SIZE, 0.0, 0.0));
+    }
+
+    #[test]
+    fn empty_arena_input_is_rejected_and_pending_intents_do_not_replay() {
+        let mut app = movement_test_app();
+        let hero = app
+            .world_mut()
+            .spawn((Hero, Selected, Active, Transform::default()))
+            .id();
+        let gamepad = app.world_mut().spawn(Gamepad::default()).id();
+        app.insert_resource(TestSelection {
+            hero,
+            active: false,
+        })
+        .add_systems(Update, sync_test_selection.in_set(HudSelectionSet));
+        app.world_mut()
+            .get_mut::<Gamepad>(gamepad)
+            .expect("invariant: the test gamepad entity has a Gamepad component")
+            .digital_mut()
+            .press(GamepadButton::DPadRight);
+
+        app.update();
+
+        assert!(app.world().get::<Active>(hero).is_none());
+        assert!(app.world().resource::<Messages<MoveHero>>().is_empty());
+        // Exercise the consumer independently of the hardware gate: an intent
+        // already in flight must be consumed while the selection is empty.
+        app.world_mut()
+            .resource_mut::<Messages<MoveHero>>()
+            .write(MoveHero {
+                direction: CardinalDirection::Right,
+            });
+        app.world_mut().run_schedule(FixedUpdate);
+        app.world_mut().resource_mut::<TestSelection>().active = true;
+        app.world_mut()
+            .get_mut::<Gamepad>(gamepad)
+            .expect("invariant: the test gamepad entity has a Gamepad component")
+            .digital_mut()
+            .reset_all();
+        app.world_mut()
+            .get_mut::<Gamepad>(gamepad)
+            .expect("invariant: the test gamepad entity has a Gamepad component")
+            .digital_mut()
+            .press(GamepadButton::DPadUp);
+        app.update();
+        assert_eq!(hero_position(&app, hero), Vec3::ZERO);
+        app.world_mut().run_schedule(FixedUpdate);
+
+        assert!(app.world().get::<Active>(hero).is_some());
+        assert_eq!(hero_position(&app, hero), Vec3::new(0.0, tile::SIZE, 0.0));
     }
 
     fn hero_position(app: &App, hero: Entity) -> Vec3 {
